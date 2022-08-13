@@ -13,6 +13,7 @@ Provides methods to manage SOL and NFTs wallet balance
 - [x] AuctionHouse interaction
     - [x] Buy NFTs
     - [x] Sell NFTs
+- [ ] Docs
 - [ ] Full tests coverage
     - [x] Manage SOL tests
     - [ ] Manage NFTs tests
