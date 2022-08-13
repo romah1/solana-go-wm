@@ -6,7 +6,7 @@ Provides methods to manage SOL and NFTs wallet balance
 
 # plans
 - [x] Manage SOL balance
-- [ ] Manage NFTs balance
+- [x] Manage NFTs balance
 - [ ] MagicEden interaction
     - [ ] Buy NFTs
     - [ ] Sell NFTs

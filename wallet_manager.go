@@ -3,7 +3,9 @@ package solana_go_wm
 import (
 	"context"
 	"github.com/gagliardetto/solana-go"
+	atok "github.com/gagliardetto/solana-go/programs/associated-token-account"
 	"github.com/gagliardetto/solana-go/programs/system"
+	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"time"
@@ -129,6 +131,65 @@ func makeTransferInstruction(from, to solana.PublicKey, lamports uint64) solana.
 		SetRecipientAccount(to).
 		SetLamports(lamports).
 		Build()
+}
+
+func (wm *WalletManager) SendNft(from solana.PrivateKey, to, mint solana.PublicKey, amount uint64) (solana.Signature, error) {
+	return wm.SpreadNfts(from, []solana.PublicKey{to}, mint, amount)
+}
+
+func (wm *WalletManager) SpreadNfts(from solana.PrivateKey, receivers []solana.PublicKey, mint solana.PublicKey, amount uint64) (solana.Signature, error) {
+	var instructions []solana.Instruction
+	fromAssociatedAddress, fromAtokInst, err := wm.getOrCreateAssociatedTokenAddress(from, from.PublicKey(), mint)
+	if err != nil {
+		return solana.Signature{}, errors.New("failed to find from associated address. err: " + err.Error())
+	}
+	if fromAtokInst != nil {
+		instructions = append(instructions, fromAtokInst)
+	}
+	for _, receiver := range receivers {
+		toAssociatedAddress, toAtokInst, err := wm.getOrCreateAssociatedTokenAddress(from, receiver, mint)
+		if err != nil {
+			return solana.Signature{}, errors.New("failed to find to associated address. err: " + err.Error())
+		}
+		if toAtokInst != nil {
+			instructions = append(instructions, toAtokInst)
+		}
+		instruction := token.NewTransferInstructionBuilder().
+			SetAmount(amount).
+			SetSourceAccount(fromAssociatedAddress).
+			SetDestinationAccount(toAssociatedAddress).
+			SetOwnerAccount(from.PublicKey()).
+			Build()
+		instructions = append(instructions, instruction)
+	}
+	return wm.sendAndConfirmInstructions(
+		from.PublicKey(),
+		instructions,
+		[]solana.PrivateKey{from},
+	)
+}
+
+func (wm *WalletManager) getOrCreateAssociatedTokenAddress(
+	payer solana.PrivateKey,
+	account,
+	mint solana.PublicKey,
+) (solana.PublicKey, *atok.Instruction, error) {
+	atokAddress, _, err := solana.FindAssociatedTokenAddress(account, mint)
+	if err != nil {
+		return solana.PublicKey{}, nil, err
+	}
+	_, err = wm.Client.GetAccountInfoWithOpts(context.TODO(), atokAddress, &rpc.GetAccountInfoOpts{
+		Commitment: wm.Commitment,
+	})
+	var createInstruction *atok.Instruction
+	if err != nil {
+		createInstruction = atok.NewCreateInstructionBuilder().
+			SetPayer(payer.PublicKey()).
+			SetMint(mint).
+			SetWallet(account).
+			Build()
+	}
+	return atokAddress, createInstruction, nil
 }
 
 func (wm *WalletManager) sendAndConfirmInstructions(
