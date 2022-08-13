@@ -14,7 +14,7 @@ Provides methods to manage SOL and NFTs wallet balance
     - [ ] Buy NFTs
     - [ ] Sell NFTs
 - [ ] Full tests coverage
-    - [ ] Manage SOL tests
+    - [x] Manage SOL tests
     - [ ] Manage NFTs tests
     - [ ] MagicEden tests
     - [ ] AuctionHouse tests
