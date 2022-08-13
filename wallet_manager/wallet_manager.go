@@ -1,4 +1,4 @@
-package solana_go_wm
+package wallet_manager
 
 import (
 	"context"
@@ -10,16 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"time"
 )
-
-type WalletManager struct {
-	Context                context.Context
-	Client                 *rpc.Client
-	Commitment             rpc.CommitmentType
-	ConfirmationStatusType rpc.ConfirmationStatusType
-	ConfirmationTimeout    time.Duration
-	ConfirmationDelay      time.Duration
-	SkipPreflight          bool
-}
 
 func NewWalletManager(
 	context context.Context,
@@ -58,7 +48,7 @@ func (wm *WalletManager) SpreadLamports(from solana.PrivateKey, receivers []sola
 	for _, receiver := range receivers {
 		instructions = append(instructions, makeTransferInstruction(from.PublicKey(), receiver, lamports))
 	}
-	return wm.sendAndConfirmInstructions(
+	return wm.SendAndConfirmInstructions(
 		from.PublicKey(),
 		instructions,
 		[]solana.PrivateKey{from},
@@ -99,7 +89,7 @@ func (wm *WalletManager) CollectAllSol(fromWallets []solana.PrivateKey, to solan
 		}
 		instructions = append(instructions, makeTransferInstruction(from.PublicKey(), to, balance.Value-fee))
 	}
-	return wm.sendAndConfirmInstructions(feePayer.PublicKey(), instructions, fromWallets)
+	return wm.SendAndConfirmInstructions(feePayer.PublicKey(), instructions, fromWallets)
 }
 
 func (wm *WalletManager) makeTransferTransaction(from solana.PrivateKey, to solana.PublicKey, lamports uint64) (*solana.Transaction, error) {
@@ -162,7 +152,7 @@ func (wm *WalletManager) SpreadNfts(from solana.PrivateKey, receivers []solana.P
 			Build()
 		instructions = append(instructions, instruction)
 	}
-	return wm.sendAndConfirmInstructions(
+	return wm.SendAndConfirmInstructions(
 		from.PublicKey(),
 		instructions,
 		[]solana.PrivateKey{from},
@@ -192,7 +182,7 @@ func (wm *WalletManager) getOrCreateAssociatedTokenAddress(
 	return atokAddress, createInstruction, nil
 }
 
-func (wm *WalletManager) sendAndConfirmInstructions(
+func (wm *WalletManager) SendAndConfirmInstructions(
 	feePayer solana.PublicKey,
 	instructions []solana.Instruction,
 	signers []solana.PrivateKey,
@@ -222,10 +212,10 @@ func (wm *WalletManager) sendAndConfirmInstructions(
 	if err != nil {
 		return solana.Signature{}, err
 	}
-	return wm.sendAndConfirmTransaction(tx)
+	return wm.SendAndConfirmTransaction(tx)
 }
 
-func (wm *WalletManager) sendAndConfirmTransaction(
+func (wm *WalletManager) SendAndConfirmTransaction(
 	tx *solana.Transaction,
 ) (solana.Signature, error) {
 	sig, err := wm.Client.SendTransactionWithOpts(wm.Context, tx, rpc.TransactionOpts{

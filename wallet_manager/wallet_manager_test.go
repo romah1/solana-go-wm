@@ -1,4 +1,4 @@
-package solana_go_wm
+package wallet_manager
 
 import (
 	"context"
