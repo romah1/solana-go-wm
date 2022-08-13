@@ -50,8 +50,8 @@ func (aucHouse *AuctionHouseActor) Buy(buyer solana.PrivateKey, data AuctionHous
 	buyInstruction := auction_house_types.NewBuyInstructionBuilder().
 		SetTradeStateBump(buyerTradeStateBump).
 		SetEscrowPaymentBump(buyerEscrowBump).
-		SetBuyerPrice(uint64(data.Price)).
-		SetTokenSize(uint64(data.TokenSize)).
+		SetBuyerPrice(data.Price).
+		SetTokenSize(data.TokenSize).
 		SetWalletAccount(buyer.PublicKey()).
 		SetPaymentAccountAccount(buyer.PublicKey()).
 		SetTransferAuthorityAccount(solana.SystemProgramID).
@@ -95,8 +95,8 @@ func (aucHouse *AuctionHouseActor) Buy(buyer solana.PrivateKey, data AuctionHous
 		SetEscrowPaymentBump(buyerEscrowBump).
 		SetFreeTradeStateBump(freeTradeStateAccountBump).
 		SetProgramAsSignerBump(programAsSignerBump).
-		SetBuyerPrice(uint64(data.Price)).
-		SetTokenSize(uint64(data.TokenSize)).
+		SetBuyerPrice(data.Price).
+		SetTokenSize(data.TokenSize).
 		SetBuyerAccount(buyer.PublicKey()).
 		SetSellerAccount(data.Owner).
 		SetMetadataAccount(metadata).
@@ -129,21 +129,72 @@ func (aucHouse *AuctionHouseActor) Buy(buyer solana.PrivateKey, data AuctionHous
 	)
 }
 
+func (aucHouse *AuctionHouseActor) Sell(
+	seller solana.PrivateKey,
+	mint solana.PublicKey,
+	priceLamports uint64,
+	amount uint64,
+) (solana.Signature, error) {
+	meta, err := getMetadata(mint)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	mintAta, _, err := solana.FindAssociatedTokenAddress(seller.PublicKey(), mint)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	programAsSigner, programAsSignerBump, err := getProgramAsSigner()
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	tradeState, tradeBump, err := aucHouse.getTradeState(seller.PublicKey(), mintAta, mint, priceLamports, amount)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	freeTradeState, freeTradeBump, err := aucHouse.getTradeState(seller.PublicKey(), mintAta, mint, 0, amount)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	instruction := auction_house_types.NewSellInstructionBuilder().
+		SetTradeStateBump(tradeBump).
+		SetFreeTradeStateBump(freeTradeBump).
+		SetProgramAsSignerBump(programAsSignerBump).
+		SetBuyerPrice(priceLamports).
+		SetTokenSize(amount).
+		SetWalletAccount(seller.PublicKey()).
+		SetMetadataAccount(meta).
+		SetTokenAccountAccount(mintAta).
+		SetAuthorityAccount(aucHouse.AuctionHouseData.Authority).
+		SetAuctionHouseAccount(aucHouse.AuctionHouseAccount).
+		SetAuctionHouseFeeAccountAccount(aucHouse.AuctionHouseData.AuctionHouseFeeAccount).
+		SetSellerTradeStateAccount(tradeState).
+		SetFreeSellerTradeStateAccount(freeTradeState).
+		SetTokenProgramAccount(solana.TokenProgramID).
+		SetSystemProgramAccount(solana.SystemProgramID).
+		SetProgramAsSignerAccount(programAsSigner).
+		SetRentAccount(solana.SysVarRentPubkey).
+		Build()
+	return aucHouse.Wm.SendAndConfirmInstructions(seller.PublicKey(), []solana.Instruction{instruction}, []solana.PrivateKey{seller})
+}
+
 func (aucHouse *AuctionHouseActor) getBuyerEscrow(wallet solana.PublicKey) (solana.PublicKey, uint8, error) {
-	return solana.FindProgramAddress([][]byte{[]byte(auctionHouse), aucHouse.AuctionHouseAccount.Bytes(), wallet.Bytes()}, AuctionHouseProgramAccount)
+	return solana.FindProgramAddress(
+		[][]byte{[]byte(auctionHouse), aucHouse.AuctionHouseAccount.Bytes(), wallet.Bytes()},
+		auction_house_types.ProgramID,
+	)
 }
 
 func (aucHouse *AuctionHouseActor) getTradeState(
 	wallet,
 	tokenAccount,
 	tokenMint solana.PublicKey,
-	buyPrice int,
-	tokenSize int,
+	price uint64,
+	tokenSize uint64,
 ) (solana.PublicKey, uint8, error) {
 	buyPriceBytes := make([]byte, 8)
 	tokenSizeBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tokenSizeBytes, uint64(tokenSize))
-	binary.LittleEndian.PutUint64(buyPriceBytes, uint64(buyPrice))
+	binary.LittleEndian.PutUint64(tokenSizeBytes, tokenSize)
+	binary.LittleEndian.PutUint64(buyPriceBytes, price)
 	return solana.FindProgramAddress(
 		[][]byte{
 			[]byte(auctionHouse),
@@ -155,7 +206,7 @@ func (aucHouse *AuctionHouseActor) getTradeState(
 			buyPriceBytes,
 			tokenSizeBytes,
 		},
-		AuctionHouseProgramAccount,
+		auction_house_types.ProgramID,
 	)
 }
 
@@ -200,6 +251,6 @@ func getAuctionHouseAccountData(client *rpc.Client, auctionHouseAccountKey solan
 func getProgramAsSigner() (solana.PublicKey, uint8, error) {
 	return solana.FindProgramAddress(
 		[][]byte{[]byte(auctionHouse), []byte("signer")},
-		AuctionHouseProgramAccount,
+		auction_house_types.ProgramID,
 	)
 }

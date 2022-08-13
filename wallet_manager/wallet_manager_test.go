@@ -15,7 +15,7 @@ var commitment = rpc.CommitmentConfirmed
 var confirmationCommitment = rpc.ConfirmationStatusConfirmed
 var confirmationTimeout = time.Duration(5) * time.Minute
 var confirmationDelay = time.Duration(5) * time.Second
-var wm = NewWalletManager(ctx, client, commitment, confirmationCommitment, confirmationTimeout, confirmationDelay, false)
+var wm = NewWalletManagerWithOpts(ctx, client, commitment, confirmationCommitment, confirmationTimeout, confirmationDelay, false)
 
 func TestWalletManager_SendLamports(t *testing.T) {
 	var cntReceivers uint64 = 5

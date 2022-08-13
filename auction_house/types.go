@@ -16,7 +16,7 @@ type AuctionHouseBuyData struct {
 	Owner       solana.PublicKey
 	MintAddress solana.PublicKey
 	MintAta     solana.PublicKey
-	Price       int
-	TokenSize   int
+	Price       uint64
+	TokenSize   uint64
 	Creators    []solana.PublicKey
 }

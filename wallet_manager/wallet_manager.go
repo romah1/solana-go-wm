@@ -11,7 +11,19 @@ import (
 	"time"
 )
 
-func NewWalletManager(
+func NewWalletManager(client *rpc.Client) *WalletManager {
+	return NewWalletManagerWithOpts(
+		context.TODO(),
+		client,
+		rpc.CommitmentFinalized,
+		rpc.ConfirmationStatusFinalized,
+		time.Duration(30)*time.Second,
+		time.Duration(5)*time.Second,
+		false,
+	)
+}
+
+func NewWalletManagerWithOpts(
 	context context.Context,
 	client *rpc.Client,
 	commitment rpc.CommitmentType,
