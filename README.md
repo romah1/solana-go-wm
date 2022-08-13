@@ -10,9 +10,9 @@ Provides methods to manage SOL and NFTs wallet balance
 - [ ] MagicEden interaction
     - [ ] Buy NFTs
     - [ ] Sell NFTs
-- [ ] AuctionHouse interaction
-    - [ ] Buy NFTs
-    - [ ] Sell NFTs
+- [x] AuctionHouse interaction
+    - [x] Buy NFTs
+    - [x] Sell NFTs
 - [ ] Full tests coverage
     - [x] Manage SOL tests
     - [ ] Manage NFTs tests
