@@ -153,39 +153,61 @@ func makeTransferInstruction(from, to solana.PublicKey, lamports uint64) solana.
 		Build()
 }
 
-func (wm *WalletManager) SendNft(from solana.PrivateKey, to, mint solana.PublicKey, amount uint64) (solana.Signature, error) {
-	return wm.SpreadNfts(from, []solana.PublicKey{to}, mint, amount)
+func (wm *WalletManager) SendTokens(feePayer solana.PrivateKey, to, mint solana.PublicKey, amount uint64) (solana.Signature, error) {
+	return wm.SendTokensTransaction(feePayer, []SendTokensInstructionParams{{feePayer, to, mint, amount}})
 }
 
-func (wm *WalletManager) SpreadNfts(from solana.PrivateKey, receivers []solana.PublicKey, mint solana.PublicKey, amount uint64) (solana.Signature, error) {
+func (wm *WalletManager) SendTokensTransaction(feePayer solana.PrivateKey, instructionsParams []SendTokensInstructionParams) (solana.Signature, error) {
 	var instructions []solana.Instruction
-	fromAssociatedAddress, fromAtokInst, err := wm.getOrCreateAssociatedTokenAddress(from, from.PublicKey(), mint)
-	if err != nil {
-		return solana.Signature{}, errors.New("failed to find from associated address. err: " + err.Error())
-	}
-	if fromAtokInst != nil {
-		instructions = append(instructions, fromAtokInst)
-	}
-	for _, receiver := range receivers {
-		toAssociatedAddress, toAtokInst, err := wm.getOrCreateAssociatedTokenAddress(from, receiver, mint)
-		if err != nil {
-			return solana.Signature{}, errors.New("failed to find to associated address. err: " + err.Error())
+	var signers []solana.PrivateKey
+	for _, params := range instructionsParams {
+		processAddress := func(to solana.PublicKey) (solana.PublicKey, error) {
+			atokAddress, fromAtokInst, err := wm.getOrCreateAssociatedTokenAddress(params.From, to, params.Mint)
+			if err != nil {
+				return solana.PublicKey{}, errors.Errorf(
+					"failed to find associated token address for %s. err: %s",
+					to.String(),
+					err.Error(),
+				)
+			}
+			if fromAtokInst != nil {
+				instructions = append(instructions, fromAtokInst)
+			}
+			return atokAddress, nil
 		}
-		if toAtokInst != nil {
-			instructions = append(instructions, toAtokInst)
+		fromAssociatedAddress, err := processAddress(params.From.PublicKey())
+		if err != nil {
+			return solana.Signature{}, err
+		}
+		toAssociatedAddress, err := processAddress(params.To)
+		if err != nil {
+			return solana.Signature{}, err
 		}
 		instruction := token.NewTransferInstructionBuilder().
-			SetAmount(amount).
+			SetAmount(params.Amount).
 			SetSourceAccount(fromAssociatedAddress).
 			SetDestinationAccount(toAssociatedAddress).
-			SetOwnerAccount(from.PublicKey()).
+			SetOwnerAccount(params.From.PublicKey()).
 			Build()
 		instructions = append(instructions, instruction)
+		signers = append(signers, params.From)
 	}
+
+	includesFeePayer := false
+	for _, signer := range signers {
+		if signer.PublicKey() == feePayer.PublicKey() {
+			includesFeePayer = true
+			break
+		}
+	}
+	if !includesFeePayer {
+		signers = append(signers, feePayer)
+	}
+
 	return wm.SendAndConfirmInstructions(
-		from.PublicKey(),
+		feePayer.PublicKey(),
 		instructions,
-		[]solana.PrivateKey{from},
+		signers,
 	)
 }
 

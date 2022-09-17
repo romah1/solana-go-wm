@@ -36,3 +36,10 @@ func (params *SendSolInstructionParams) toLamports() SendLamportsInstructionPara
 		uint64(params.Sol * float64(solana.LAMPORTS_PER_SOL)),
 	}
 }
+
+type SendTokensInstructionParams struct {
+	From   solana.PrivateKey
+	To     solana.PublicKey
+	Mint   solana.PublicKey
+	Amount uint64
+}
