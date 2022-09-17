@@ -44,14 +44,14 @@ func NewWalletManagerWithOpts(
 }
 
 func (wm *WalletManager) SendSol(from solana.PrivateKey, to solana.PublicKey, amountSol float64) (solana.Signature, error) {
-	return wm.SendSolTransaction(from.PublicKey(), []SendSolInstructionParams{{from, to, amountSol}})
+	return wm.SendSolTransaction(from, []SendSolInstructionParams{{from, to, amountSol}})
 }
 
 func (wm *WalletManager) SendLamports(from solana.PrivateKey, to solana.PublicKey, lamports uint64) (solana.Signature, error) {
-	return wm.SendLamportsTransaction(from.PublicKey(), []SendLamportsInstructionParams{{from, to, lamports}})
+	return wm.SendLamportsTransaction(from, []SendLamportsInstructionParams{{from, to, lamports}})
 }
 
-func (wm *WalletManager) SendSolTransaction(feePayer solana.PublicKey, instructionsParams []SendSolInstructionParams) (solana.Signature, error) {
+func (wm *WalletManager) SendSolTransaction(feePayer solana.PrivateKey, instructionsParams []SendSolInstructionParams) (solana.Signature, error) {
 	var params []SendLamportsInstructionParams
 	for _, solParams := range instructionsParams {
 		params = append(params, solParams.toLamports())
@@ -59,15 +59,16 @@ func (wm *WalletManager) SendSolTransaction(feePayer solana.PublicKey, instructi
 	return wm.SendLamportsTransaction(feePayer, params)
 }
 
-func (wm *WalletManager) SendLamportsTransaction(feePayer solana.PublicKey, instructionsParams []SendLamportsInstructionParams) (solana.Signature, error) {
+func (wm *WalletManager) SendLamportsTransaction(feePayer solana.PrivateKey, instructionsParams []SendLamportsInstructionParams) (solana.Signature, error) {
 	var instructions []solana.Instruction
 	var signers []solana.PrivateKey
 	for _, params := range instructionsParams {
 		instructions = append(instructions, makeTransferInstruction(params.From.PublicKey(), params.To, params.Lamports))
 		signers = append(signers, params.From)
 	}
+	signers = appendSignerIfNotPresented(signers, feePayer)
 	return wm.SendAndConfirmInstructions(
-		feePayer,
+		feePayer.PublicKey(),
 		instructions,
 		signers,
 	)
@@ -192,18 +193,7 @@ func (wm *WalletManager) SendTokensTransaction(feePayer solana.PrivateKey, instr
 		instructions = append(instructions, instruction)
 		signers = append(signers, params.From)
 	}
-
-	includesFeePayer := false
-	for _, signer := range signers {
-		if signer.PublicKey() == feePayer.PublicKey() {
-			includesFeePayer = true
-			break
-		}
-	}
-	if !includesFeePayer {
-		signers = append(signers, feePayer)
-	}
-
+	signers = appendSignerIfNotPresented(signers, feePayer)
 	return wm.SendAndConfirmInstructions(
 		feePayer.PublicKey(),
 		instructions,

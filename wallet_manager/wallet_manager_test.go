@@ -34,7 +34,7 @@ func TestWalletManager_SendLamports(t *testing.T) {
 		})
 	}
 
-	sig, err := wm.SendLamportsTransaction(from.PublicKey(), params)
+	sig, err := wm.SendLamportsTransaction(from.PrivateKey, params)
 	if err != nil {
 		t.Fatalf("failed to spread lamports. err: %s", err.Error())
 	}
