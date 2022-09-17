@@ -25,16 +25,21 @@ func TestWalletManager_SendLamports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to request airdrop: %s", err.Error())
 	}
-	var receivers []solana.PublicKey
+	var params []SendLamportsInstructionParams
 	for i := uint64(0); i < cntReceivers; i++ {
-		receivers = append(receivers, solana.NewWallet().PublicKey())
+		params = append(params, SendLamportsInstructionParams{
+			From:     from.PrivateKey,
+			To:       solana.NewWallet().PublicKey(),
+			Lamports: lamportsPerReceiver,
+		})
 	}
 
-	sig, err := wm.SpreadLamports(from.PrivateKey, receivers, lamportsPerReceiver)
+	sig, err := wm.SendLamportsTransaction(from.PublicKey(), params)
 	if err != nil {
 		t.Fatalf("failed to spread lamports. err: %s", err.Error())
 	}
-	for _, receiver := range receivers {
+	for _, param := range params {
+		receiver := param.To
 		result, err := client.GetBalance(ctx, receiver, commitment)
 		if err != nil {
 			t.Fatalf("failed to get balance of %s", receiver.String())

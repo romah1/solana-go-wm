@@ -44,15 +44,33 @@ func NewWalletManagerWithOpts(
 }
 
 func (wm *WalletManager) SendSol(from solana.PrivateKey, to solana.PublicKey, amountSol float64) (solana.Signature, error) {
-	return wm.SpreadSol(from, []solana.PublicKey{to}, amountSol)
+	return wm.SendSolTransaction(from.PublicKey(), []SendSolInstructionParams{{from, to, amountSol}})
 }
 
 func (wm *WalletManager) SendLamports(from solana.PrivateKey, to solana.PublicKey, lamports uint64) (solana.Signature, error) {
-	return wm.SpreadLamports(from, []solana.PublicKey{to}, lamports)
+	return wm.SendLamportsTransaction(from.PublicKey(), []SendLamportsInstructionParams{{from, to, lamports}})
 }
 
-func (wm *WalletManager) SpreadSol(from solana.PrivateKey, toWallets []solana.PublicKey, sol float64) (solana.Signature, error) {
-	return wm.SpreadLamports(from, toWallets, uint64(sol*float64(solana.LAMPORTS_PER_SOL)))
+func (wm *WalletManager) SendSolTransaction(feePayer solana.PublicKey, instructionsParams []SendSolInstructionParams) (solana.Signature, error) {
+	var params []SendLamportsInstructionParams
+	for _, solParams := range instructionsParams {
+		params = append(params, solParams.toLamports())
+	}
+	return wm.SendLamportsTransaction(feePayer, params)
+}
+
+func (wm *WalletManager) SendLamportsTransaction(feePayer solana.PublicKey, instructionsParams []SendLamportsInstructionParams) (solana.Signature, error) {
+	var instructions []solana.Instruction
+	var signers []solana.PrivateKey
+	for _, params := range instructionsParams {
+		instructions = append(instructions, makeTransferInstruction(params.From.PublicKey(), params.To, params.Lamports))
+		signers = append(signers, params.From)
+	}
+	return wm.SendAndConfirmInstructions(
+		feePayer,
+		instructions,
+		signers,
+	)
 }
 
 func (wm *WalletManager) SpreadLamports(from solana.PrivateKey, receivers []solana.PublicKey, lamports uint64) (solana.Signature, error) {
